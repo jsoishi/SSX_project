@@ -1,0 +1,35 @@
+\documentclass{article}
+
+\usepackage{amsmath}
+
+\begin{document}
+
+\section{Geometry}
+\label{sec:geom}
+
+We'll start with a rectangular duct periodic in the cross-stream directions, $x$ and $y$. In the streamwise direction, $z$, we will implement boundary conditions.
+
+If boundaries turn out to be important, we can pursue two further ideas
+
+\begin{enumerate}
+\item Immersed boundary conditions to construct a cylinder embedded within the rectangular duct. This still won't have proper boundary conditions, but it will have the proper geometry
+\item Using the full-disk basis functions for $r$-$\theta$ connected to Chebyshev in $z$. This requires some not-quite-yet finished features of Dedalus, but will allow full boundary conditions in all directions.
+\end{enumerate}
+\section{Basic equations}
+\label{sec:equations}
+
+We start with the equations from Schaffner et al (2014).
+
+\section{Fully nonlinear terms}
+\label{sec:fully_nonlinear}
+
+A so-called ``fully nonlinear'' equation is one in which a non-linearity appears in the term with the highest derivative. This occurs in several places in the MHD equations used by Schaffner et al. Most importantly, it appears in the Spitzer resistivity $\eta_S$. We can start our runs with a constant resistivity to see how well that works. However, it is common in plasma modelling to assume that the dynamic viscosity $\mu$ and thermal conductivity $\kappa$ are constant. For example, the highest derivative term in the temperature equation is
+\begin{equation}
+  \label{eq:heat_diff}
+ \frac{\mathbf{\nabla \cdot \kappa \nabla} T}{\rho}.
+\end{equation}
+Since we assume $\kappa$ constant, the thermal diffusivity $\chi = \kappa/\rho$ is now a function of $\rho$. 
+
+
+Terms with nonlinear diffusion coefficients require some care in Dedalus. In order to implement boundary conditions that we need, we must have enough $z$-derivatives. This means that we have to fit a linear term on the left hand side of the equation in order to be allowed to specify enough boundary conditions. 
+\end{document}
