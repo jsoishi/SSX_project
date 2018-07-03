@@ -1,9 +1,23 @@
-\documentclass{article}
+\documentclass{jpp}
 
+\usepackage{hyperref}
 \usepackage{amsmath}
+\usepackage{physics}
+\newcommand{\vnorm}{\vb{\hat{n}}}
+
+\shorttitle{Notes on MHD Boundary Conditions}
+\shortauthor{Oishi et al}
+
+\title{Notes on MHD Boundary Conditions and Equations for SSX modelling}
+
+\author{Jeffrey S. Oishi\aff{1}
+  \corresp{\email{joishi@bates.edu}}}
+
+\affiliation{\aff{1}Department of Physics \& Astronomy, Bates College,
+Lewiston, ME 02140, USA}
 
 \begin{document}
-
+\maketitle
 \section{Geometry}
 \label{sec:geom}
 
@@ -18,10 +32,42 @@ If boundaries turn out to be important, we can pursue two further ideas
 \section{Basic equations}
 \label{sec:equations}
 
-We start with the equations from Schaffner et al (2014).
+We start with the equations from \citet[][S14 hereafter]{2014PPCF...56f4003S}. However, we need to make a few things explicit to specify the boundary conditions. We are applying boundary conditions in the $z$ direction (which we are discretizing with Chebyshev polynomials). PDEs allow boundary conditions for each \emph{order} in space. For example, $\laplacian{\phi} = 0$ is second order in $z$, so this allows us to set two boundary conditions; typically, we would set those either on $\phi$ or its derivative at the boundary.
+
+
+\subsection{Vector Potential Equation}
+\label{sec:A_eq}
+
+In order to ensure the divergence free constraint, we evolve the vector potential $\vb{A}$ instead of the magnetic field $\vb{B}$. Like S14, we chose the Coulomb gauge,  $\div{\vb{A}} = 0$. However, this introduces an interesting problem: we are now faced with ensuring that $\vb{B}$ is divergence free. It seems like we have not gained anything over simply solving for $\vb{B}$ in the first place. However, because the equation for $\vb{A}$ is the ``uncurled'' equation for $\vb{B}$, we are free to add an extra gradient term,
+\begin{equation}
+  \label{eq:A_with_phi}
+  \frac{\partial \vb{A}}{\partial t} = \vb{u} \cross \vb{B} - \eta \vb{J} + \grad{\phi}
+\end{equation}
+where $\phi$ is a scalar field with no physical significance. This allows us to construct a first order formulation of the problem in $z$ that has six variables, six equations, and allows six boundary conditions. This choice renders the magnetic equations identical to incompressible hydrodynamics. In order to make this analogy, $\vb{A}$ plays the role of velocity $\vb{u}$, so $\vb{B} = \curl{\vb{A}}$ is equivalent to vorticity $\vb{\omega} = \curl{\vb{u}}$.
+
+We choose the dynamical variables that we solve for to be $A_x$, $A_y$, $A_z$, $\phi$, $B_x$, and $B_y$. The current density $\vb{J} = \curl{\vb{B}} = \curl{\curl{\vb{A}}} = \grad{\left(\div{\vb{A}}\right)} - \laplacian{\vb{A}}$, by standard \href{https://en.wikipedia.org/wiki/Vector_calculus_identities}{vector calculus identities}. However, since we have chosen the Coulomb gauge $\vb{J} = - \laplacian{\vb{A}}$.
+
+Dedalus requires that all equations be written in a first order form in the Chebyshev ($z$) direction. Given our choice of dynamical variables and the equations at hand, we write 
+
+\section{Boundary conditions}
+\label{sec:bc}
+
+The boundary conditions are unmodified from S14, but we describe them in detail. The good news is that the boundary conditions are all simple enough that we can satisfy them using parity bases, that is $\sin/\cos$ depending on the vector component or scalar field. 
+
+\subsection{Velocities,  Temperature, Density}
+\label{sec:vel_bc}
+
+Following S114, we use impenetrable, free-slip boundary conditions, $\vnorm \vdot \vb{u} = \vnorm \vdot \grad{\left(\vnorm \cross \vb{u}\right)} = 0$. The density requires no boundary conditions, as we are using impenetrable velocity boundary conditions, and density has no diffusion coefficient. Temperature boundary conditions are such that the flux, $\mathcal{F} = -\kappa \grad{T}$, is zero. This implies that $\grad{T} = 0$.
+
+
+\subsection{Magnetic Fields}
+\label{sec:B_bc}
+
+For this project, we need perfect conductor boundary conditions. You can find them derived in many places, but the basic idea is that we need $\vb{B} \vdot \vnorm = 0$ and $\pdv{B_x}{z} = \pdv{B_x}{z} = 0$. In our formulation, we simply enforce the latter two as is. The former one is a bit trickier, since we don't have $B_z$ as a dynamical variable to set to zero. What we actually have is the $z$ component of the curl of $\vb{A}$, $B_z = \pdv{A_y}{x} - \pdv{A_x}{y}$. We can set this to zero, except for the zero mode in both horizontal directions. Remember that we use Fourier bases in $x$ and $y$, which makes derivatives into multiplications in coefficient space, e.g. $\pdv{B_x}{x} = -i k_x \hat{B}_x$. So, at $k_x = k_y = 0$, this boundary condition becomes $0 = 0$. This is bad. So instead, for that mode, we simply set $\phi = 0$, because $\phi$ is only defined up to a constant.
+
 
 \section{Fully nonlinear terms}
-\label{sec:fully_nonlinear}
+\label{sec:fully_nonlinear} 
 
 A so-called ``fully nonlinear'' equation is one in which a non-linearity appears in the term with the highest derivative. This occurs in several places in the MHD equations used by Schaffner et al. Most importantly, it appears in the Spitzer resistivity $\eta_S$. We can start our runs with a constant resistivity to see how well that works. However, it is common in plasma modelling to assume that the dynamic viscosity $\mu$ and thermal conductivity $\kappa$ are constant. For example, the highest derivative term in the temperature equation is
 \begin{equation}
@@ -31,5 +77,11 @@ A so-called ``fully nonlinear'' equation is one in which a non-linearity appears
 Since we assume $\kappa$ constant, the thermal diffusivity $\chi = \kappa/\rho$ is now a function of $\rho$. 
 
 
-Terms with nonlinear diffusion coefficients require some care in Dedalus. In order to implement boundary conditions that we need, we must have enough $z$-derivatives. This means that we have to fit a linear term on the left hand side of the equation in order to be allowed to specify enough boundary conditions. 
+Terms with nonlinear diffusion coefficients require some care in Dedalus. In order to implement boundary conditions that we need, we must have enough $z$-derivatives. This means that we have to fit a linear term on the left hand side of the equation in order to be allowed to specify enough boundary conditions.
+
+\bibliographystyle{jpp}
+% Note the spaces between the initials
+
+\bibliography{SSX}
+
 \end{document}
