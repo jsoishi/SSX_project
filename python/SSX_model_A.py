@@ -39,13 +39,16 @@ from spheromak import spheromak_A
 import logging
 logger = logging.getLogger(__name__)
 
-nx = 64#0
-ny = 64#0
-nz = 64#0
+nx = 64
+ny = 64
+nz = 64
 r = 0.08
 length = 2
 
-#mesh = None
+# for 3D runs, you can divide the work up over two dimensions (x and y).
+# The product of the two elements of mesh *must* equal the number
+# of cores used.
+# mesh = None
 mesh = [8,8]
 
 kappa = 0.1
@@ -112,7 +115,9 @@ SSX.add_equation("dt(vz) + dz(T) - nu*Lap(vz) = T*dz(lnrho) - vdotgrad(vz) + (jx
 SSX.add_equation("dt(Ax) + eta*jx + dx(phi) = vy*Bz - vz*By")
 SSX.add_equation("dt(Ay) + eta*jy + dy(phi) = vz*Bx - vx*Bz")
 SSX.add_equation("dt(Az) + eta*jz + dz(phi) = vx*By - vy*Bx")
-SSX.add_equation("dx(Ax) + dy(Ay) + dz(Az) = 0")
+SSX.add_equation("dx(Ax) + dy(Ay) + dz(Az) = 0", condition="(nx != 0) or (ny != 0) or (nz != 0)")
+SSX.add_equation("phi = 0", condition="(nx == 0) and (ny == 0) and (nz == 0)")
+
 
 # Energy
 SSX.add_equation("dt(T) - (gamma - 1) * chi*Lap(T) = - (gamma - 1) * T * divv  - vdotgrad(T) + (gamma - 1)*eta*J2")
@@ -120,7 +125,7 @@ SSX.add_equation("dt(T) - (gamma - 1) * chi*Lap(T) = - (gamma - 1) * T * divv  -
 solver = SSX.build_solver(de.timesteppers.RK443)
 
 # Initial timestep
-dt = 1e-5
+dt = 1e-3
 
 # Integration parameters
 solver.stop_sim_time = 100
