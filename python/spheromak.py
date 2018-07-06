@@ -65,7 +65,7 @@ def spheromak(Bx, By, Bz, domain, center=(0,0,0), B0=1, R=1, L=1):
 
     
     # calculate cylindrical fields
-    Br = B0 * kz/kr * j1(kr*r) * np.cos(kz*z)
+    Br = -B0 * kz/kr * j1(kr*r) * np.cos(kz*z)
     Bt = B0 * lam/kr * j1(kr*r) * np.sin(kz*z)
 
     # convert back to cartesian, place on grid.
