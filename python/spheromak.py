@@ -1,5 +1,41 @@
+import dedalus.public as de
 import numpy as np
 from scipy.special import j0, j1, jn_zeros
+
+def spheromak_A(domain, center=(0,0,0), B0=1, R=1, L=1):
+    """Solve 
+
+    Laplacian(A) = - J0
+
+    J0 = S(r) l_sph [ -pi J1(a r) cos(pi z) rhat + l_sph*J1(a r)*sin(pi z)
+
+    """
+
+    problem = de.LBVP(domain, variables=['Ax', 'Ay', 'Az'])
+    problem.meta['Ax']['y', 'z']['parity'] =  -1
+    problem.meta['Ax']['x']['parity'] = 1
+    problem.meta['Ay']['x', 'z']['parity'] = -1
+    problem.meta['Ay']['y']['parity'] = 1
+    problem.meta['Az']['x', 'y']['parity'] = -1
+    problem.meta['Az']['z']['parity'] = 1
+
+    J0_x = domain.new_field()
+    J0_y = domain.new_field()
+    J0_z = domain.new_field()
+    problem.parameters['J0_x'] = J0_x
+    problem.parameters['J0_y'] = J0_y
+    problem.parameters['J0_z'] = J0_z
+
+    problem.add_equation("dx(dx(Ax)) + dy(dy(Ax)) + dz(dz(Ax)) = J0_x")
+    problem.add_equation("dx(dx(Ay)) + dy(dy(Ay)) + dz(dz(Ay)) = J0_y")
+    problem.add_equation("dx(dx(Az)) + dy(dy(Az)) + dz(dz(Az)) = J0_z")
+
+    # Build solver
+    solver = problem.build_solver()
+    solver.solve()
+
+    return solver.state['Ax']['g'], solver.state['Ay']['g'], solver.state['Az']['g']
+    
 
 def spheromak(Bx, By, Bz, domain, center=(0,0,0), B0=1, R=1, L=1):
     """domain must be a dedalus domain
