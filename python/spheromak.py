@@ -26,9 +26,15 @@ def spheromak_A(domain, center=(0,0,0), B0=1, R=1, L=1):
     problem.parameters['J0_y'] = J0_y
     problem.parameters['J0_z'] = J0_z
 
-    problem.add_equation("dx(dx(Ax)) + dy(dy(Ax)) + dz(dz(Ax)) = J0_x")
-    problem.add_equation("dx(dx(Ay)) + dy(dy(Ay)) + dz(dz(Ay)) = J0_y")
-    problem.add_equation("dx(dx(Az)) + dy(dy(Az)) + dz(dz(Az)) = J0_z")
+
+    problem.add_equation("dx(dx(Ax)) + dy(dy(Ax)) + dz(dz(Ax)) = J0_x", condition="(nx != 0) or (ny != 0) or (nz != 0)")
+    problem.add_equation("Ax = 0", condition="(nx == 0) and (ny == 0) and (nz == 0)")
+
+    problem.add_equation("dx(dx(Ay)) + dy(dy(Ay)) + dz(dz(Ay)) = J0_y", condition="(nx != 0) or (ny != 0) or (nz != 0)")
+    problem.add_equation("Ay = 0", condition="(nx == 0) and (ny == 0) and (nz == 0)")
+    
+    problem.add_equation("dx(dx(Az)) + dy(dy(Az)) + dz(dz(Az)) = J0_z", condition="(nx != 0) or (ny != 0) or (nz != 0)")
+    problem.add_equation("Az = 0", condition="(nx == 0) and (ny == 0) and (nz == 0)")
 
     # Build solver
     solver = problem.build_solver()
