@@ -2,14 +2,53 @@ import dedalus.public as de
 import numpy as np
 from scipy.special import j0, j1, jn_zeros
 
+def getS(r, z):
+    lamJ = .1
+    S = np.zeros((r*z).shape)
+
+    for i in range(r.shape[0]):
+        for j in range(r.shape[1]):
+            for k in range(r.shape[2]):
+                entry = r[i][j][k]
+                if(entry<(1-lamJ)):
+                    entry = 1
+                elif(entry<=1 and entry>=(1-lamJ)):
+                    entry = .5*(1-np.cos(np.pi*(1-entry)/lamJ))
+                else:
+                    entry = 1
+                    print("r out of bounds!")
+
+    for i in range(z.shape[0]):
+        for j in range(z.shape[1]):
+            for k in range(z.shape[2]):
+                entry = z[i][j][k]
+                if(entry<=lamJ and entry>=0):
+                    entry = .5*(1-np.cos(np.pi*entry/lamJ))
+                elif(entry<(1-lamJ) and entry>lamJ):
+                    entry = 1
+                elif(entry<=1 and entry>=(1-lamJ)):
+                    entry = .5*(1-np.cos(np.pi(1-entry)/lamJ))
+                elif(entry<=11.1 and entry<1):
+                    entry = 0
+                else:
+                    entry = 1
+                    print("z out of bounds!")
+    S = r*z
+    return S
+
 def spheromak_A(domain, center=(0,0,0), B0=1, R=1, L=1):
-    """Solve 
+    """Solve
 
     Laplacian(A) = - J0
 
     J0 = S(r) l_sph [ -pi J1(a r) cos(pi z) rhat + l_sph*J1(a r)*sin(pi z)
 
     """
+    j1_zero1 = jn_zeros(1,1)[0]
+    kr = j1_zero1/R
+    kz = np.pi/L
+
+    lam = np.sqrt(kr**2 + kz**2)
 
     problem = de.LBVP(domain, variables=['Ax', 'Ay', 'Az'])
     problem.meta['Ax']['y', 'z']['parity'] =  -1
@@ -22,6 +61,20 @@ def spheromak_A(domain, center=(0,0,0), B0=1, R=1, L=1):
     J0_x = domain.new_field()
     J0_y = domain.new_field()
     J0_z = domain.new_field()
+    xx, yy, zz = domain.grids()
+
+    r = np.sqrt((xx-center[0])**2 + (yy-center[1])**2)
+    theta = np.arctan2(yy,xx)
+    z = zz - center[2]
+    S = getS(r,z)
+
+    J_r = S*lam*(-np.pi*j1(kr*r)*np.cos(np.pi*z))
+    J_t = S*lam*(lam*j1(kr*r)*np.sin(np.pi*z))
+
+    J0_x['g'] = J_r*np.cos(theta) - J_t*np.sin(theta)
+    J0_y['g'] = J_r*np.sin(theta) + J_t*np.cos(theta)
+    J0_z['g'] = S*lam*j0(kr*r)*np.sin(np.pi*z)
+
     problem.parameters['J0_x'] = J0_x
     problem.parameters['J0_y'] = J0_y
     problem.parameters['J0_z'] = J0_z
@@ -32,7 +85,7 @@ def spheromak_A(domain, center=(0,0,0), B0=1, R=1, L=1):
 
     problem.add_equation("dx(dx(Ay)) + dy(dy(Ay)) + dz(dz(Ay)) = J0_y", condition="(nx != 0) or (ny != 0) or (nz != 0)")
     problem.add_equation("Ay = 0", condition="(nx == 0) and (ny == 0) and (nz == 0)")
-    
+
     problem.add_equation("dx(dx(Az)) + dy(dy(Az)) + dz(dz(Az)) = J0_z", condition="(nx != 0) or (ny != 0) or (nz != 0)")
     problem.add_equation("Az = 0", condition="(nx == 0) and (ny == 0) and (nz == 0)")
 
@@ -41,7 +94,7 @@ def spheromak_A(domain, center=(0,0,0), B0=1, R=1, L=1):
     solver.solve()
 
     return solver.state['Ax']['g'], solver.state['Ay']['g'], solver.state['Az']['g']
-    
+
 
 def spheromak(Bx, By, Bz, domain, center=(0,0,0), B0=1, R=1, L=1):
     """domain must be a dedalus domain
@@ -55,7 +108,7 @@ def spheromak(Bx, By, Bz, domain, center=(0,0,0), B0=1, R=1, L=1):
     j1_zero1 = jn_zeros(1,1)[0]
     kr = j1_zero1/R
     kz = np.pi/L
-    
+
     lam = np.sqrt(kr**2 + kz**2)
 
     # construct cylindrical coordinates centered on center
@@ -63,7 +116,7 @@ def spheromak(Bx, By, Bz, domain, center=(0,0,0), B0=1, R=1, L=1):
     theta = np.arctan2(yy,xx)
     z = zz - center[2]
 
-    
+
     # calculate cylindrical fields
     Br = -B0 * kz/kr * j1(kr*r) * np.cos(kz*z)
     Bt = B0 * lam/kr * j1(kr*r) * np.sin(kz*z)
