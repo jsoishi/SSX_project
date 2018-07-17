@@ -1,6 +1,6 @@
 """SSX_model_A.py
 
-This is the *simplest* model we will consider for modelling spheromaks evolving in the SSX wind tunnel. 
+This is the *simplest* model we will consider for modelling spheromaks evolving in the SSX wind tunnel.
 
 Major simplificiations fall in two categories
 
@@ -34,6 +34,9 @@ import numpy as np
 import dedalus.public as de
 from dedalus.extras import flow_tools
 
+from matplotlib import pyplot
+import matplotlib as mpl
+
 from spheromak import spheromak_A
 
 import logging
@@ -42,14 +45,14 @@ logger = logging.getLogger(__name__)
 nx = 64
 ny = 64
 nz = 64
-r = 0.08
+r = 0.1
 length = 2
 
 # for 3D runs, you can divide the work up over two dimensions (x and y).
 # The product of the two elements of mesh *must* equal the number
 # of cores used.
 # mesh = None
-mesh = [8,8]
+mesh = [12,12]
 
 kappa = 0.1
 mu = 0.1
@@ -97,16 +100,16 @@ SSX.substitutions['By'] = "dz(Ax) - dx(Az)"
 SSX.substitutions['Bz'] = "dx(Ay) - dy(Ax)"
 
 # Coulomb Gauge implies J = -Laplacian(A)
-SSX.substitutions['jx'] = "-Lap(Ax)" 
+SSX.substitutions['jx'] = "-Lap(Ax)"
 SSX.substitutions['jy'] = "-Lap(Ay)"
-SSX.substitutions['jz'] = "-Lap(Az)" 
+SSX.substitutions['jz'] = "-Lap(Az)"
 SSX.substitutions['J2'] = "jx**2 + jy**2 + jz**2"
 SSX.substitutions['rho'] = "exp(lnrho)"
 
 # Continuity
 SSX.add_equation("dt(lnrho) + divv = - vdotgrad(lnrho)")
 
-# Momentum 
+# Momentum
 SSX.add_equation("dt(vx) + dx(T) - nu*Lap(vx) = T*dx(lnrho) - vdotgrad(vx) + (jy*Bz - jz*By)/rho")
 SSX.add_equation("dt(vy) + dy(T) - nu*Lap(vy) = T*dy(lnrho) - vdotgrad(vy) + (jz*Bx - jx*Bz)/rho")
 SSX.add_equation("dt(vz) + dz(T) - nu*Lap(vz) = T*dz(lnrho) - vdotgrad(vz) + (jx*By - jy*Bx)/rho")
@@ -125,12 +128,12 @@ SSX.add_equation("dt(T) - (gamma - 1) * chi*Lap(T) = - (gamma - 1) * T * divv  -
 solver = SSX.build_solver(de.timesteppers.RK443)
 
 # Initial timestep
-dt = 1e-3
+dt = 5e-4
 
 # Integration parameters
 solver.stop_sim_time = 100
 solver.stop_wall_time = np.inf
-solver.stop_iteration = 100 # np.inf
+solver.stop_iteration = 200 # np.inf
 
 
 # Initial conditions
@@ -143,42 +146,50 @@ T = solver.state['T']
 x = domain.grid(0)
 y = domain.grid(1)
 z = domain.grid(2)
+fullGrid = x*y*z
 
 # Initial condition parameters
-L = 0.1*length
-R = L
-lambda_rho = 0.4 # half-width of transition region for initial conditions
+R = r
+L = R
+lambda_rho = L # half-width of transition region for initial conditions
 rho_min = 0.011
 T0 = 0.1
 
-## Not implemented yet
-# aa_x, aa_y, aa_z = spheromak_A(domain, center=(0,0, length/2), R=R, L=L)
-# Ax['g'] = aa_x
-# Ay['g'] = aa_y
-# Az['g'] = aa_z
+## Not implemented yet (now mostly implemented!)
+aa_x, aa_y, aa_z = spheromak_A(domain, center=(0,0, L/2), R=R, L=L)
+Ax['g'] = aa_x
+Ay['g'] = aa_y
+Az['g'] = aa_z
 
-transition_mask = ((1-lambda_rho) <= z) & ((1 + lambda_rho) >= z)
-outside_mask = (1 + lambda_rho) < z
+
+for i in range(x.shape[0]):
+    xVal = x[i,0,0]
+    for j in range(y.shape[1]):
+        yVal = y[0,j,0]
+        for k in range(z.shape[2]):
+            zVal = z[0,0,k]
+            if((zVal<=(2*lambda_rho)) and (np.sqrt(xVal**2 + yVal**2)<R)):
+                fullGrid[i][j][k] = (1 + rho_min)/2 + (1 - rho_min)/2*np.cos(zVal * np.pi/(2*lambda_rho)) #rho_min + rho_min*np.cos(zVal*np.pi/(2*lambda_rho))
+            else:
+                fullGrid[i][j][k] = rho_min
+
 
 rho0 = domain.new_field()
-rho0['g'] = 1.
-rho0['g'][:,:,transition_mask[0,0,:]] = (1 + rho_min)/2 + (1 - rho_min)/2*np.sin((1-z[transition_mask]) * np.pi/(2*lambda_rho))
-rho0['g'][:,:,outside_mask[0,0,:]] = rho_min
+rho0['g'] = fullGrid
 
 lnrho['g'] = np.log(rho0['g'])
-
 T['g'] = T0 * rho0['g']**(gamma - 1)
 
 
 # analysis output
-data_dir = './'+sys.argv[0].split('.py')[0]
+#data_dir = './'+sys.argv[0].split('.py')[0]
 wall_dt_checkpoints = 60*55
-output_cadence = 100. # FIX THIS
+output_cadence = .01 # This is in simulation time units
 
-checkpoint = solver.evaluator.add_file_handler(os.path.join(data_dir, 'checkpoints'), max_writes=1, wall_dt=wall_dt_checkpoints, mode='overwrite')
+checkpoint = solver.evaluator.add_file_handler('checkpoints', max_writes=1, wall_dt=wall_dt_checkpoints, mode='overwrite')
 checkpoint.add_system(solver.state, layout='c')
 
-field_writes = solver.evaluator.add_file_handler(os.path.join(data_dir, 'fields'), max_writes=50, sim_dt = 10*output_cadence, mode='overwrite')
+field_writes = solver.evaluator.add_file_handler('fields', max_writes=50, sim_dt = output_cadence, mode='overwrite')
 field_writes.add_task('vx')
 field_writes.add_task('vy')
 field_writes.add_task('vz')
